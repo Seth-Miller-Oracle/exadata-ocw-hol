@@ -3,7 +3,7 @@
 ```
 create tablespace users datafile size 4G autoextend on next 1G;
 
-CREATE USER sh IDENTIFIED BY Oracle_4U;
+CREATE USER sh IDENTIFIED BY <password>;
 
 ALTER USER sh DEFAULT TABLESPACE users
 QUOTA UNLIMITED ON users;
@@ -42,6 +42,8 @@ prep/flush_shared_pool.sql -- execute as sys
 ## Grants
 
 ```
+grant connect to sh;
+grant select on v_$sysstat to sh;
 grant select on v_$mystat to sh;
 grant select on v_$statname to sh;
 grant execute on flush_buffer_cache to sh;
@@ -111,14 +113,9 @@ create table customers_fc as
 select * from customers_org
 where 1=0;
 
-BEGIN
-FOR i IN 1 .. 10 LOOP
 insert /*+ APPEND PARALLEL(4) */ into customers_fc
 select * from customers_org;
 commit;
-END LOOP;
-END;
-/
 ```
 
 ## Miscellaneous

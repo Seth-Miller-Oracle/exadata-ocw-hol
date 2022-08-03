@@ -17,10 +17,10 @@ done
 # Variables
 
 SYS_USER=${sys_user:-sys}
-SYS_USER_PASSWORD=${sys_user_password:-Oracle_4U}
+SYS_USER_PASSWORD=${sys_user_password}
 CONNECT_STRING=${connect_string}
 USER_NAME='sh'
-USER_PASSWORD='Oracle_4U'
+USER_PASSWORD='sh'
 USER_TABLESPACE='users'
 DATA_PUMP_OS_DIR='/home/oracle/ocw_exports'
 DATA_PUMP_DB_DIR='ocw_exports'
@@ -121,7 +121,10 @@ run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 # Grant user additional privileges
 
 SQL_COMMAND="$SQL_SETUP
+GRANT CONNECT TO ${USER_NAME?};
+GRANT CREATE TABLE TO ${USER_NAME?};
 GRANT SELECT ON v_\$mystat TO ${USER_NAME?};
+GRANT SELECT ON v_\$sysstat TO ${USER_NAME?};
 GRANT SELECT ON v_\$statname TO ${USER_NAME?};
 GRANT EXECUTE ON flush_buffer_cache TO ${USER_NAME?};
 GRANT EXECUTE ON flush_shared_pool TO ${USER_NAME?};
@@ -186,13 +189,8 @@ CREATE TABLE ${USER_NAME?}.customers_fc AS
 SELECT * FROM ${USER_NAME?}.customers_org
 WHERE 1=0;
 
-BEGIN
-FOR i IN 1 .. 10 LOOP
 INSERT /*+ APPEND PARALLEL(4) */ INTO ${USER_NAME?}.customers_fc
 SELECT * FROM ${USER_NAME?}.customers_org;
 COMMIT;
-END LOOP;
-END;
-/
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
