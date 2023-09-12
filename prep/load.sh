@@ -30,7 +30,7 @@ then PREVIEW='True'
 else PREVIEW='False'
 fi
 
-SQLPLUS_SYS="sqlplus -s ${sys_user:?}/\"${sys_user_password:?}\"@${connect_string:?} AS SYSDBA"
+SQLPLUS_SYS="sqlplus -s ${sys_user?}/\"${sys_user_password?}\"@${connect_string?} AS SYSDBA"
 SQL_SETUP='SET ECHO ON
 SET TERMOUT OFF
 SET FEEDBACK ON
