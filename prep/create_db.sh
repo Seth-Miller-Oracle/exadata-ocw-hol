@@ -50,7 +50,7 @@ run_dbca () {
         -recoveryGroupName ${reco_dg?} \
         -databaseConfType RAC \
         -automaticMemoryManagement FALSE \
-        -initParams 'sga_target=5G,pga_aggregate_target=5G'" | tr -s ' ')
+        -initParams 'sga_target=5G,pga_aggregate_target=5G,processes=500'" | tr -s ' ')
 
     if [[ "$PREVIEW" = "True" ]]; then
         echo
