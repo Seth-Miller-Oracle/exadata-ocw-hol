@@ -1,9 +1,34 @@
 #!/usr/bin/sh
 
 
+usage() {
+  
+  echo "Usage: $0 [ -f target_list_file | -t target_list ] [ -u database_name ] [ -e template_name ]"
+  echo "          [ -o oracle_sid ] [ -n node_list ] [ -s sys_password ] [ -d data_disk_group ]"
+  echo "          [ -r reco_disk_group ] [ -p ] [ -h ]"
+  echo
+  echo "f     A file containing the list of databases to create. The target names must be space delimited on a single line."
+  echo "t     One or more database names to create. The target names must be space delimited in quotes."
+  echo "u     Database name (DB_NAME). Defaults to the target name."
+  echo "e     The name of the DBCA template. Defaults to General_Purpose.dbc."
+  echo "o     Oracle SID (ORACLE_SID). Defaults to the target name."
+  echo "n     List of RAC node names. The node names must be comma delimited in quotes."
+  echo "s     SYS user password."
+  echo "d     ASM data disk group."
+  echo "r     ASM reco disk group."
+  echo "p     Preview commands without executing them."
+  echo "h     Print this Help."
+  echo
+}
+
+exit_abnormal() {
+  usage
+  exit 1
+}
+
 # Parameters
 
-while getopts f:t:u:e:o:n:s:d:r:p: flag
+while getopts f:t:u:e:o:n:s:d:r:ph flag
 do
     case "${flag}" in
         f) for_list=${OPTARG};;
@@ -15,15 +40,16 @@ do
         s) sys_password=${OPTARG};;
         d) data_dg=${OPTARG};;
         r) reco_dg=${OPTARG};;
-        p) preview=${OPTARG};;
+        p) preview=True;;
+        h) usage; exit;;
+	:) echo "Error: -${OPTARG} requires an argument."
+           exit_abnormal;;
+        *) exit_abnormal;;
     esac
 done
 
 
-if [[ "${preview:0:1}" = "T" || "${preview:0:1}" = "t" ]]
-    then PREVIEW='True'
-    else PREVIEW='False'
-fi
+PREVIEW=${preview:=False}
 
 template_name=${template_name:-General_Purpose.dbc}
 

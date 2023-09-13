@@ -62,7 +62,7 @@ EOF
 
 if [[ "$PREVIEW" = "False" ]]; then
     $SQLPLUS_SYS << EOF
-        select 'successful sqlplus execution' from dual;
+        select 'successful sqlplus execution' sqlplus_check from dual;
 EOF
 
     if [[ $? -ne 0 ]]; then
