@@ -3,24 +3,20 @@
 
 usage() {
   
-  echo "Usage: $0 [ -f target_list_file | -t target_list ] [ -b database_version ] [ -u database_name ] [ -e template_name ]"
-  echo "          [ -o oracle_sid ] [ -n node_list ] [ -p sys_password ] [ -s storage_type ] [ -d datafile_dest  ]"
-  echo "          [ -c recofile_dest ] [ -l ] [ -r ] [ -h ]"
+  echo "Usage: $0 <-p sys_user_password> [-u db_user_name] [-w db_user_password] [-t db_user_tablespace]"
+  echo "          <-o data_pump_os_dir> <-d data_pump_db_dir> <-f data_pump_prefix> <-c connect_string>"
+  echo "          [-r] [-h]"
   echo
-  echo "f     A file containing the list of databases to create. The target names must be space delimited on a single line."
-  echo "t     One or more database names to create. The target names must be space delimited in quotes."
-  echo "b     Database version. Must be '19' or '23'."
-  echo "u     Database name (DB_NAME). Defaults to the target name."
-  echo "e     The name of the DBCA template. Defaults to General_Purpose.dbc."
-  echo "o     Oracle SID (ORACLE_SID). Defaults to the target name."
-  echo "n     List of RAC node names. The node names must be comma delimited in quotes."
-  echo "p     SYS user password."
-  echo "s     Database storage type. Must be 'ASM' or 'EXASCALE'."
-  echo "d     Datafile destination. If the storage type is ASM, this will also be the data disk group."
-  echo "c     Recovery file destination."
-  echo "l     Exports the parameter 'CV_ASSUME_DISTID=OL7' before running dbca."
-  echo "r     Preview commands without executing them."
-  echo "h     Print this Help."
+  echo "  -p sys_user_password    SYS user password"
+  echo "  -u db_user_name         database user name; defaults to 'SH'"
+  echo "  -w db_user_password     database user password; defaults to sys_user_password"
+  echo "  -t db_user_tablespace   database user tablespace; defaults to 'USERS'"
+  echo "  -o data_pump_os_dir     operating system directory containing Data Pump dump file"
+  echo "  -d data_pump_db_dir     Data Pump database directory name"
+  echo "  -f data_pump_prefix     file prefix for Data Pump dump and log files"
+  echo "  -c connect_string       EZ Connect connect string"
+  echo "  -r                      preview commands without executing them"
+  echo "  -h                      print this help"
   echo
 }
 
@@ -31,22 +27,20 @@ exit_abnormal() {
 
 # Parameters
 
-while getopts s:p:n:m:t:o:d:f:c:a:rh flag
+while getopts p:u:w:t:o:d:f:c:rh flag
 do
     case "${flag}" in
-        s) sys_user=${OPTARG};;
         p) sys_user_password=${OPTARG};;
-        n) user_name=${OPTARG};;
-        m) user_password=${OPTARG};;
-        t) user_tablespace=${OPTARG};;
+        u) db_user_name=${OPTARG};;
+        w) db_user_password=${OPTARG};;
+        t) db_user_tablespace=${OPTARG};;
         o) data_pump_os_dir=${OPTARG};;
         d) data_pump_db_dir=${OPTARG};;
         f) data_pump_prefix=${OPTARG};;
         c) connect_string=${OPTARG};;
-        a) database_name=${OPTARG};;
         r) preview=True;;
         h) usage; exit;;
-	:) echo "Error: -${OPTARG} requires an argument."
+    	:) echo "Error: -${OPTARG} requires an argument."
            exit_abnormal;;
         *) exit_abnormal;;
     esac
@@ -54,10 +48,12 @@ done
 
 
 PREVIEW=${preview:=False}
-sys_user=${sys_user:-sys}
+db_user_name=${db_user_name:=SH}
+db_user_password=${db_user_password:=${sys_user_password?}}
+db_user_tablespace=${db_user_tablespace:=USERS}
 
 
-SQLPLUS_SYS="sqlplus -s ${sys_user?}/\"${sys_user_password?}\"@${connect_string?} AS SYSDBA"
+SQLPLUS_SYS="sqlplus -s sys/\"${sys_user_password?}\"@${connect_string?} AS SYSDBA"
 SQL_SETUP='SET ECHO ON
 SET TERMOUT OFF
 SET FEEDBACK ON
@@ -80,7 +76,6 @@ run_sqlplus () {
         $conn << EOF
         $comm
 EOF
-        #echo "exit code: $?"
     fi
 }
 
@@ -125,7 +120,7 @@ CREATE DIRECTORY ${data_pump_db_dir?} AS '${data_pump_os_dir?}';
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
-OS_COMMAND=("impdp \"'${sys_user:?}/${sys_user_password:?}@${connect_string:?} AS SYSDBA'\" dumpfile=${data_pump_prefix?}.dmp directory=${data_pump_db_dir} logfile=imp_${data_pump_prefix?}.log")
+OS_COMMAND=("impdp \"'sys/${sys_user_password?}@${connect_string?} AS SYSDBA'\" dumpfile=${data_pump_prefix?}.dmp directory=${data_pump_db_dir} logfile=imp_${data_pump_prefix?}.log")
 if [[ "$PREVIEW" = "True" ]]; then
  echo
  echo "${OS_COMMAND[@]}"
