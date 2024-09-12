@@ -43,7 +43,7 @@ do
         w) db_user_password=${OPTARG};;
         r) preview=True;;
         h) usage; exit;;
-	:) echo "Error: -${OPTARG} requires an argument."
+	    :) echo "Error: -${OPTARG} requires an argument."
            exit_abnormal;;
         *) exit_abnormal;;
     esac
@@ -92,7 +92,6 @@ run_sqlplus () {
         $conn << EOF
         $comm
 EOF
-        #echo "exit code: $?"
     fi
 }
 
