@@ -3,14 +3,21 @@
 
 usage() {
   
-  echo "Usage: $0 [ -s sys_user_password | -c connect_string ] [ -d pdb_name ]"
-  echo "          [ -p ] [ -h ]"
+  echo "Usage: $0 <-p sys_user_password> <-s scan_name> <-n database_name> <-d pdb_name> <-g|-v> <-f file_dest>"
+  echo "          [-u db_user_name] [-w db_user_password] [-r] [-h]"
   echo
-  echo "s     SYS user password."
-  echo "c     EZ Connect connection string to the CDB in the form of scan_name/service_name."
-  echo "d     PDB name."
-  echo "p     Preview commands without executing them."
-  echo "h     Print this Help."
+  echo "  -p sys_user_password   SYS user password"
+  echo "  -s scan_name           SCAN name"
+  echo "  -n database_name       database name"
+  echo "  -d pdb_name            PDB name suffix; PDB name will be <database_name>_<pdb_name>"
+  echo "  -g                     use a disk group (ASM) for database file storage; file_dest prefix will be '+'"
+  echo "  -v                     use a vault (Exascale> for database file storage; file_dest prefix will be '@'"
+  echo "  -f file_dest           database file destination path suffix;"
+  echo "                           file destination path will be <+|@><database_name>_<file_dest>"
+  echo "  -u db_user_name        database user name; must start with 'C##'; defaults to 'C##SH'"
+  echo "  -w db_user_password    database user password; defaults to sys_user_password"
+  echo "  -r                     preview commands without executing them"
+  echo "  -h                     print this help"
   echo
 }
 
@@ -22,13 +29,19 @@ exit_abnormal() {
 
 # Parameters
 
-while getopts s:c:d:ph flag
+while getopts p:s:n:d:gvf:u:w:rh flag
 do
     case "${flag}" in
-        s) sys_user_password=${OPTARG};;
-        c) connect_string=${OPTARG};;
+        p) sys_user_password=${OPTARG};;
+        s) scan_name=${OPTARG};;
+        n) database_name=${OPTARG};;
         d) pdb_name=${OPTARG};;
-        p) preview=True;;
+        g) file_dest_asm=True;;
+        v) file_dest_exascale=True;;
+        f) file_dest_suffix=${OPTARG};;
+        u) db_user_name=${OPTARG};;
+        w) db_user_password=${OPTARG};;
+        r) preview=True;;
         h) usage; exit;;
 	:) echo "Error: -${OPTARG} requires an argument."
            exit_abnormal;;
@@ -37,12 +50,26 @@ do
 done
 
 
+if [[ "$file_dest_asm" = "True" && "$file_dest_exascale" = "True" ]]; then
+    echo "Invalid option. Choose either -g or -v, not both."
+    exit_abnormal
+elif [[ "$file_dest_asm" = "True" ]]; then
+    file_dest="+${database_name?}_${file_dest_suffix?}"
+elif [[ "$file_dest_exascale" = "True" ]]; then
+    file_dest="@${database_name?}_${file_dest_suffix?}"
+else
+    echo "Invalid option. Choose either -g or -v."
+    exit_abnormal
+fi
+
 PREVIEW=${preview:=False}
+db_user_name=${db_user_name:=C##SH}
+db_user_password=${db_user_password:=${sys_user_password?}}
 
 
 # Variables
 
-SQLPLUS_SYS="sqlplus -s sys/\"${sys_user_password:?}\"@${connect_string:?} AS SYSDBA"
+SQLPLUS_SYS="sqlplus -s sys/\"${sys_user_password?}\"@${scan_name?}/${database_name?} AS SYSDBA"
 SQL_SETUP='SET ECHO ON
 SET TERMOUT OFF
 SET FEEDBACK ON
@@ -85,7 +112,23 @@ fi
 
 
 SQL_COMMAND="$SQL_SETUP
-create pluggable database ${pdb_name:?} admin user pdbadmin identified by ${sys_user_password:?};
-alter pluggable database ${pdb_name:?} open instances=all;
+create user ${db_user_name?} identified by ${db_user_password?};
+grant sysdba to ${db_user_name?} container=all;
+
+create pluggable database ${database_name?}_${pdb_name?} admin user pdbadmin identified by ${sys_user_password?};
+alter pluggable database ${database_name?}_${pdb_name?} open restricted;
+alter session set container=${database_name?}_${pdb_name?};
+
+create temporary tablespace temp_pdb tempfile '${file_dest?}' size 100m autoextend on next 100m maxsize unlimited;
+alter database default temporary tablespace temp_pdb;
+drop tablespace temp including contents and datafiles;
+create temporary tablespace temp tempfile '${file_dest?}' size 100m autoextend on next 100m maxsize unlimited;
+alter database default temporary tablespace temp;
+drop tablespace temp_pdb including contents and datafiles;
+
+alter session set container=CDB\$ROOT;
+alter pluggable database ${database_name?}_${pdb_name?} close immediate instances=all;
+alter pluggable database ${database_name?}_${pdb_name?} open instances=all;
 "
+
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"

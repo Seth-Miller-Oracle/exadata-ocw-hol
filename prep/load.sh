@@ -1,9 +1,37 @@
 #!/usr/bin/sh
 
 
+usage() {
+  
+  echo "Usage: $0 [ -f target_list_file | -t target_list ] [ -b database_version ] [ -u database_name ] [ -e template_name ]"
+  echo "          [ -o oracle_sid ] [ -n node_list ] [ -p sys_password ] [ -s storage_type ] [ -d datafile_dest  ]"
+  echo "          [ -c recofile_dest ] [ -l ] [ -r ] [ -h ]"
+  echo
+  echo "f     A file containing the list of databases to create. The target names must be space delimited on a single line."
+  echo "t     One or more database names to create. The target names must be space delimited in quotes."
+  echo "b     Database version. Must be '19' or '23'."
+  echo "u     Database name (DB_NAME). Defaults to the target name."
+  echo "e     The name of the DBCA template. Defaults to General_Purpose.dbc."
+  echo "o     Oracle SID (ORACLE_SID). Defaults to the target name."
+  echo "n     List of RAC node names. The node names must be comma delimited in quotes."
+  echo "p     SYS user password."
+  echo "s     Database storage type. Must be 'ASM' or 'EXASCALE'."
+  echo "d     Datafile destination. If the storage type is ASM, this will also be the data disk group."
+  echo "c     Recovery file destination."
+  echo "l     Exports the parameter 'CV_ASSUME_DISTID=OL7' before running dbca."
+  echo "r     Preview commands without executing them."
+  echo "h     Print this Help."
+  echo
+}
+
+exit_abnormal() {
+  usage
+  exit 1
+}
+
 # Parameters
 
-while getopts s:p:n:m:t:o:d:f:c:r: flag
+while getopts s:p:n:m:t:o:d:f:c:a:rh flag
 do
     case "${flag}" in
         s) sys_user=${OPTARG};;
@@ -15,20 +43,19 @@ do
         d) data_pump_db_dir=${OPTARG};;
         f) data_pump_prefix=${OPTARG};;
         c) connect_string=${OPTARG};;
-        r) preview=${OPTARG};;
+        a) database_name=${OPTARG};;
+        r) preview=True;;
+        h) usage; exit;;
+	:) echo "Error: -${OPTARG} requires an argument."
+           exit_abnormal;;
+        *) exit_abnormal;;
     esac
 done
 
 
-# Variables
-
+PREVIEW=${preview:=False}
 sys_user=${sys_user:-sys}
 
-
-if [[ "${preview:0:1}" = "T" || "${preview:0:1}" = "t" ]]
-then PREVIEW='True'
-else PREVIEW='False'
-fi
 
 SQLPLUS_SYS="sqlplus -s ${sys_user?}/\"${sys_user_password?}\"@${connect_string?} AS SYSDBA"
 SQL_SETUP='SET ECHO ON
@@ -192,3 +219,31 @@ SELECT * FROM ${user_name?}.customers_org;
 COMMIT;
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
+
+SQL_COMMAND="$SQL_SETUP
+SHUTDOWN IMMEDIATE
+STARTUP
+"
+run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
+
+SQL_COMMAND="$SQL_SETUP
+COLUMN tempfile NEW_VALUE tempfile
+SELECT name tempfile FROM v\$tempfile;
+ALTER DATABASE TEMPFILE '&tempfile' RESIZE 100M;
+"
+run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
+
+SQL_COMMAND="$SQL_SETUP
+COLUMN tempfile NEW_VALUE tempfile
+SELECT name tempfile FROM v\$tempfile;
+ALTER DATABASE TEMPFILE '&tempfile' RESIZE 100M;
+"
+run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
+
+SQL_COMMAND="$SQL_SETUP
+COLUMN tempfile NEW_VALUE tempfile
+SELECT name tempfile FROM v\$tempfile;
+ALTER DATABASE TEMPFILE '&tempfile' RESIZE 100M;
+"
+run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
+
