@@ -3,16 +3,16 @@
 
 usage() {
   
-  echo "Usage: $0 [ -p sys_user_password ] [ -s scan_name ] [ -n database_name ] [ -u user_name ] [ -d pdb_name ]"
-  echo "          [ -p ] [ -h ]"
+  echo "Usage: $0 <-p sys_user_password> [-u db_user_name] <-s scan_name> <-n database_name>"
+  echo "          <-d pdb_name> [-r] [-h]"
   echo
-  echo "p     SYS user password."
-  echo "s     SCAN name."
-  echo "n     Database name."
-  echo "u     User name."
-  echo "d     PDB name suffix."
-  echo "p     Preview commands without executing them."
-  echo "h     Print this Help."
+  echo "  -p sys_user_password    SYS user password"
+  echo "  -u db_user_name         database user name; defaults to 'SH'"
+  echo "  -s scan_name            cluster SCAN name"
+  echo "  -n database_name        database name"
+  echo "  -d pdb_name             PDB name suffix; PDB name will be <database_name>_<pdb_name>"
+  echo "  -r                      preview commands without executing them"
+  echo "  -h                      print this help"
   echo
 }
 
@@ -24,17 +24,17 @@ exit_abnormal() {
 
 # Parameters
 
-while getopts p:s:n:u:d:rh flag
+while getopts p:u:s:n:d:rh flag
 do
     case "${flag}" in
         p) sys_user_password=${OPTARG};;
+        u) db_user_name=${OPTARG};;
         s) scan_name=${OPTARG};;
         n) database_name=${OPTARG};;
-        u) user_name=${OPTARG};;
         d) pdb_name=${OPTARG};;
         r) preview=True;;
         h) usage; exit;;
-	:) echo "Error: -${OPTARG} requires an argument."
+        :) echo "Error: -${OPTARG} requires an argument."
            exit_abnormal;;
         *) exit_abnormal;;
     esac
@@ -42,6 +42,7 @@ done
 
 
 PREVIEW=${preview:=False}
+db_user_name=${db_user_name:=SH}
 
 
 # Variables
@@ -76,7 +77,6 @@ run_sqlplus () {
         $conn << EOF
         $comm
 EOF
-        #echo "exit code: $?"
     fi
 }
 
@@ -122,7 +122,7 @@ echo
 SQL_COMMAND="$SQL_SETUP2
 $SQL_PDB
 SELECT COUNT(*) FROM dba_tables
-WHERE owner = '${user_name^^?}'
+WHERE owner = '${db_user_name^^?}'
 AND table_name = 'MYCUST_ARCHIVE';
 "
 mycust_archive_var=$(query_db "$SQLPLUS_SYS" "$SQL_COMMAND")
@@ -130,7 +130,7 @@ mycust_archive_var=$(query_db "$SQLPLUS_SYS" "$SQL_COMMAND")
 SQL_COMMAND="$SQL_SETUP2
 $SQL_PDB
 SELECT COUNT(*) FROM dba_tables
-WHERE owner = '${user_name^^?}'
+WHERE owner = '${db_user_name^^?}'
 AND table_name = 'MYCUST_QUERY';
 "
 mycust_query_var=$(query_db "$SQLPLUS_SYS" "$SQL_COMMAND")
@@ -138,7 +138,7 @@ mycust_query_var=$(query_db "$SQLPLUS_SYS" "$SQL_COMMAND")
 SQL_COMMAND="$SQL_SETUP2
 $SQL_PDB
 SELECT COUNT(*) FROM dba_tables
-WHERE owner = '${user_name^^?}'
+WHERE owner = '${db_user_name^^?}'
 AND table_name = 'CUSTOMERS_FC';
 "
 customers_fc_var=$(query_db "$SQLPLUS_SYS" "$SQL_COMMAND")
@@ -159,7 +159,7 @@ thin_clone_var=$(query_db "$SQLPLUS_SYS" "$SQL_COMMAND")
 if [[ ${mycust_archive_var?} != "0" ]]; then
     SQL_COMMAND="$SQL_SETUP
     $SQL_PDB
-    DROP TABLE ${user_name?}.mycust_archive PURGE;
+    DROP TABLE ${db_user_name?}.mycust_archive PURGE;
     "
     run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 fi
@@ -167,7 +167,7 @@ fi
 if [[ ${mycust_query_var?} != "0" ]]; then
     SQL_COMMAND="$SQL_SETUP
     $SQL_PDB
-    DROP TABLE ${user_name?}.mycust_query PURGE;
+    DROP TABLE ${db_user_name?}.mycust_query PURGE;
     "
     run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 fi
@@ -175,7 +175,7 @@ fi
 if [[ ${customers_fc_var?} != "0" ]]; then
     SQL_COMMAND="$SQL_SETUP
     $SQL_PDB
-    DROP TABLE ${user_name?}.customers_fc PURGE;
+    DROP TABLE ${db_user_name?}.customers_fc PURGE;
     "
     run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 fi
@@ -198,12 +198,12 @@ fi
 
 SQL_COMMAND="$SQL_SETUP
 $SQL_PDB
-create table ${user_name?}.customers_fc as
-select * from ${user_name?}.customers_org
+create table ${db_user_name?}.customers_fc as
+select * from ${db_user_name?}.customers_org
 where 1=0;
 
-INSERT /*+ APPEND PARALLEL(4) */ INTO ${user_name?}.customers_fc
-SELECT * FROM ${user_name?}.customers_org;
+INSERT /*+ APPEND PARALLEL(4) */ INTO ${db_user_name?}.customers_fc
+SELECT * FROM ${db_user_name?}.customers_org;
 
 commit;
 "
@@ -212,7 +212,7 @@ run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
 $SQL_PDB
-select cust_gender, count(*) from ${user_name?}.customers
+select cust_gender, count(*) from ${db_user_name?}.customers
 where cust_income_level = 'C: 50,000 - 69,999'
 group by cust_gender;
 "
@@ -221,7 +221,7 @@ run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
 $SQL_PDB
-truncate table ${user_name?}.fc_lab;
+truncate table ${db_user_name?}.fc_lab;
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
