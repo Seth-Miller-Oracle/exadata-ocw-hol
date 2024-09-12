@@ -14,7 +14,9 @@ usage() {
   echo "  -o data_pump_os_dir     operating system directory containing Data Pump dump file"
   echo "  -d data_pump_db_dir     Data Pump database directory name"
   echo "  -f data_pump_prefix     file prefix for Data Pump dump and log files"
-  echo "  -c connect_string       EZ Connect connect string"
+  echo "  -c connect_string       EZ Connect connect string that includes cluster scan name,"
+  echo "                             database service name, and database instance name;"
+  echo "                             e.g. scan_name/pdb_name/instance1"
   echo "  -r                      preview commands without executing them"
   echo "  -h                      print this help"
   echo
@@ -97,18 +99,18 @@ fi
 # Create SH tablespace and user
 
 SQL_COMMAND="$SQL_SETUP
-CREATE TABLESPACE ${user_tablespace?} DATAFILE SIZE 4G AUTOEXTEND ON NEXT 1G;
+CREATE TABLESPACE ${db_user_tablespace?} DATAFILE SIZE 4G AUTOEXTEND ON NEXT 1G;
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
-CREATE USER ${user_name?} IDENTIFIED BY ${user_password?};
+CREATE USER ${db_user_name?} IDENTIFIED BY ${db_user_password?};
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
-ALTER USER ${user_name?} DEFAULT TABLESPACE ${user_tablespace?}
-    QUOTA UNLIMITED ON ${user_tablespace?};
+ALTER USER ${db_user_name?} DEFAULT TABLESPACE ${db_user_tablespace?}
+    QUOTA UNLIMITED ON ${db_user_tablespace?};
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
@@ -141,13 +143,13 @@ run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 # Grant user additional privileges
 
 SQL_COMMAND="$SQL_SETUP
-GRANT CONNECT TO ${user_name?};
-GRANT CREATE TABLE TO ${user_name?};
-GRANT SELECT ON v_\$sysstat TO ${user_name?};
-GRANT SELECT ON v_\$mystat TO ${user_name?};
-GRANT SELECT ON v_\$statname TO ${user_name?};
-GRANT EXECUTE ON flush_buffer_cache TO ${user_name?};
-GRANT EXECUTE ON flush_shared_pool TO ${user_name?};
+GRANT CONNECT TO ${db_user_name?};
+GRANT CREATE TABLE TO ${db_user_name?};
+GRANT SELECT ON v_\$sysstat TO ${db_user_name?};
+GRANT SELECT ON v_\$mystat TO ${db_user_name?};
+GRANT SELECT ON v_\$statname TO ${db_user_name?};
+GRANT EXECUTE ON flush_buffer_cache TO ${db_user_name?};
+GRANT EXECUTE ON flush_shared_pool TO ${db_user_name?};
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
@@ -156,19 +158,19 @@ run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
 WHENEVER SQLERROR CONTINUE
-DROP TABLE ${user_name?}.mycust_archive PURGE;
-DROP TABLE ${user_name?}.mycust_query PURGE;
+DROP TABLE ${db_user_name?}.mycust_archive PURGE;
+DROP TABLE ${db_user_name?}.mycust_query PURGE;
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
-CREATE TABLE ${user_name?}.sales AS
-SELECT * FROM ${user_name?}.sales_org WHERE 1=0;
+CREATE TABLE ${db_user_name?}.sales AS
+SELECT * FROM ${db_user_name?}.sales_org WHERE 1=0;
 
 BEGIN
 FOR i IN 1 .. 64 LOOP
-INSERT /*+ APPEND PARALLEL(4) */ INTO ${user_name?}.sales
-SELECT * FROM ${user_name?}.sales_org;
+INSERT /*+ APPEND PARALLEL(4) */ INTO ${db_user_name?}.sales
+SELECT * FROM ${db_user_name?}.sales_org;
 COMMIT;
 END LOOP;
 END;
@@ -177,13 +179,13 @@ END;
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
-CREATE TABLE ${user_name?}.customers_tmp AS
-SELECT * FROM ${user_name?}.customers_org WHERE 1=0;
+CREATE TABLE ${db_user_name?}.customers_tmp AS
+SELECT * FROM ${db_user_name?}.customers_org WHERE 1=0;
 
 BEGIN
 FOR i IN 1 .. 155 LOOP
-INSERT /*+ APPEND PARALLEL(4) */ INTO ${user_name?}.customers_tmp
-SELECT * FROM ${user_name?}.customers_org;
+INSERT /*+ APPEND PARALLEL(4) */ INTO ${db_user_name?}.customers_tmp
+SELECT * FROM ${db_user_name?}.customers_org;
 COMMIT;
 END LOOP;
 END;
@@ -192,12 +194,12 @@ END;
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
-CREATE TABLE ${user_name?}.customers AS
-SELECT * FROM ${user_name?}.customers_org
+CREATE TABLE ${db_user_name?}.customers AS
+SELECT * FROM ${db_user_name?}.customers_org
 WHERE 1=0;
 
-INSERT /*+ APPEND */ INTO ${user_name?}.customers
-SELECT * FROM ${user_name?}.customers_tmp
+INSERT /*+ APPEND */ INTO ${db_user_name?}.customers
+SELECT * FROM ${db_user_name?}.customers_tmp
 ORDER BY cust_income_level;
 
 COMMIT;
@@ -205,12 +207,12 @@ COMMIT;
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
 
 SQL_COMMAND="$SQL_SETUP
-CREATE TABLE ${user_name?}.customers_fc AS
-SELECT * FROM ${user_name?}.customers_org
+CREATE TABLE ${db_user_name?}.customers_fc AS
+SELECT * FROM ${db_user_name?}.customers_org
 WHERE 1=0;
 
-INSERT /*+ APPEND PARALLEL(4) */ INTO ${user_name?}.customers_fc
-SELECT * FROM ${user_name?}.customers_org;
+INSERT /*+ APPEND PARALLEL(4) */ INTO ${db_user_name?}.customers_fc
+SELECT * FROM ${db_user_name?}.customers_org;
 COMMIT;
 "
 run_sqlplus "$SQLPLUS_SYS" "$SQL_COMMAND"
