@@ -4,4 +4,4 @@ The wallet password is osc#ocw#
 
 The two credentials are:
  - db: username=sh password=osc#ocw#
- - cdb username=c##sh password=osc#ocw#
+ - cdb: username=c##sh password=osc#ocw#
